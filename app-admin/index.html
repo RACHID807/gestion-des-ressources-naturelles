@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Administration Centrale - Ressources Naturelles</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <link rel="stylesheet" href="./style.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  </head>
+  <body>
+    <div id="app">
+      <!-- Authentification View -->
+      <section id="auth-section" class="active">
+        <div class="auth-card">
+          <h1>Admin Portal</h1>
+          <p>Centre de contrôle et de surveillance sécurisé.</p>
+          <form id="login-form">
+            <input type="text" id="admin-id" placeholder="Identifiant Administrateur" required />
+            <input type="password" id="password" placeholder="Mot de passe" required />
+            <button type="submit" class="btn-primary">Connexion Admin</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- Main App View -->
+      <section id="main-section" class="hidden">
+        <div class="sidebar">
+          <h2>RN-Admin</h2>
+          <ul id="sidebar-menu">
+            <li class="active" id="nav-dashboard">Tableau de bord</li>
+            <li id="nav-users">Agents</li>
+            <li id="nav-leaderboard">Leaderboard</li>
+            <li id="nav-sensitization">Sensibilisation</li>
+            <li id="nav-logout">Déconnexion</li>
+          </ul>
+        </div>
+        
+        <div class="content-area">
+          <header class="topbar">
+            <h3>Vue d'ensemble</h3>
+            <div class="user-info">
+              <span id="admin-user-name">Admin System</span>
+              <div class="avatar" id="admin-user-avatar">A</div>
+            </div>
+          </header>
+
+          <div class="dashboard-content">
+            <!-- Statistiques Cards -->
+            <div class="stats-grid">
+              <div class="stat-card">
+                <h4>Total Signalements</h4>
+                <div class="value">1 245</div>
+                <div class="trend positive">+12% cette semaine</div>
+              </div>
+              <div class="stat-card">
+                <h4>En attente</h4>
+                <div class="value" style="color: #f39c12;">184</div>
+                <div class="trend negative">+5% (Action requise)</div>
+              </div>
+              <div class="stat-card">
+                <h4>Agents Actifs</h4>
+                <div class="value" style="color: #27ae60;">42</div>
+                <div class="trend positive">En mission actuellement</div>
+              </div>
+              <div class="stat-card">
+                <h4>Ressources Protégées</h4>
+                <div class="value" style="color: #3498db;">89</div>
+                <div class="trend neutral">Couverture stable</div>
+              </div>
+            </div>
+
+            <!-- Chart Box -->
+            <div class="chart-panel" style="background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 40px;">
+              <h4 style="margin-bottom: 20px; color: var(--secondary-color); font-size: 1.2rem;">Évolution des statuts</h4>
+              <canvas id="statusChart" height="80"></canvas>
+            </div>
+
+            <!-- Map Panel -->
+            <div class="map-panel" style="background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 40px; overflow: hidden;">
+              <h4 style="padding: 20px 30px; border-bottom: 1px solid #f0f0f0; color: var(--secondary-color); font-size: 1.2rem;">Carte de surveillance en direct</h4>
+              <div id="admin-map" style="height: 400px; width: 100%;"></div>
+            </div>
+
+            <!-- Liste Récente -->
+            <div class="recent-reports-panel">
+              <h4>Dernières alertes critiques</h4>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Agent Assigné</th>
+                    <th>Localisation</th>
+                    <th>Statut</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-reports-table">
+                  <!-- Injecté via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Gestion Utilisateurs View -->
+          <div id="users-view" class="dashboard-content hidden">
+            <div class="users-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+              <h4>Liste des utilisateurs</h4>
+              <button class="btn-primary" style="width: auto; padding: 10px 20px;" onclick="document.getElementById('add-agent-modal').classList.remove('hidden')">+ Nouvel Agent</button>
+            </div>
+
+            <!-- Add Agent Inline Form / "Modal" -->
+            <div id="add-agent-modal" class="hidden" style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+              <h5 style="margin-bottom: 15px; color: var(--secondary-color);">Créer un compte Agent</h5>
+              <form id="add-agent-form" style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; align-items: center;">
+                <input type="text" id="new-agent-name" placeholder="Nom Complet" required style="margin-bottom: 0;" />
+                <input type="email" id="new-agent-email" placeholder="Email" required style="margin-bottom: 0;" />
+                <input type="password" id="new-agent-password" placeholder="Mot de passe" required style="margin-bottom: 0;" />
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn-primary" style="margin-bottom: 0;">Créer</button>
+                    <button type="button" class="btn-secondary" onclick="document.getElementById('add-agent-modal').classList.add('hidden')" style="margin-bottom: 0;">Annuler</button>
+                </div>
+              </form>
+            </div>
+
+            <div class="recent-reports-panel">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Nom Complet</th>
+                    <th>Email</th>
+                    <th>Rôle</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-users-table">
+                  <!-- Injecté via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Leaderboard View -->
+          <div id="leaderboard-view" class="dashboard-content hidden">
+            <div class="header-banner">
+              <h3>Classement des Éco-Héros</h3>
+              <p>Performance et impact des agents sur le terrain.</p>
+            </div>
+            <div class="leaderboard-grid" id="leaderboard-container">
+              <!-- Injecté via JS -->
+            </div>
+          </div>
+
+          <!-- Sensitization View -->
+          <div id="sensitization-view" class="dashboard-content hidden">
+            <div class="users-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+              <h4>Contenu Éducatif & Sensibilisation</h4>
+              <button class="btn-primary" style="width: auto; padding: 10px 20px;" onclick="document.getElementById('add-article-modal').classList.remove('hidden')">+ Nouvel Article</button>
+            </div>
+
+            <div id="add-article-modal" class="hidden glass-panel" style="padding: 30px; margin-bottom: 30px;">
+              <h5>Publier un message de sensibilisation</h5>
+              <form id="add-article-form" style="display: flex; flex-direction: column; gap: 15px;">
+                <input type="text" id="article-title" placeholder="Titre de l'article" required />
+                <select id="article-category" class="modern-select" style="margin-bottom: 0;">
+                  <option value="FORET">Protection des Forêts</option>
+                  <option value="EAU">Gestion de l'Eau</option>
+                  <option value="SOL">Pollution des Sols</option>
+                  <option value="AIR">Qualité de l'Air</option>
+                </select>
+                <textarea id="article-content" placeholder="Contenu de la sensibilisation..." required style="min-height: 150px; padding: 15px; border-radius: 8px; border: 1px solid #ddd;"></textarea>
+                <div style="display: flex; gap: 15px;">
+                  <button type="submit" class="btn-primary">Publier</button>
+                  <button type="button" class="btn-secondary" onclick="document.getElementById('add-article-modal').classList.add('hidden')">Annuler</button>
+                </div>
+              </form>
+            </div>
+
+            <div class="articles-grid" id="articles-list">
+              <!-- Injecté via JS -->
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+    
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portail Citoyen - Ressources Naturelles</title>
+    <!-- Google Fonts for Modern Typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <link rel="stylesheet" href="./style.css">
+  </head>
+  <body>
+    <div id="app">
+      <!-- Authentification View -->
+      <section id="auth-section" class="glass-panel active">
+        <div class="auth-header">
+          <h1>EcoCitoyen</h1>
+          <p>La plateforme intelligente pour nos ressources.</p>
+        </div>
+        <form id="login-form">
+          <input type="email" id="email" placeholder="Adresse Email" required />
+          <input type="password" id="password" placeholder="Mot de passe" required />
+          <button type="submit" class="btn-primary">Connexion</button>
+          <p class="switch-auth">Pas encore de compte ? <span id="btn-show-register">S'inscrire</span></p>
+        </form>
+
+        <form id="register-form" class="hidden">
+          <input type="text" id="reg-name" placeholder="Nom Complet" required />
+          <input type="email" id="reg-email" placeholder="Adresse Email" required />
+          <input type="password" id="reg-password" placeholder="Mot de passe" required />
+          <button type="submit" class="btn-primary" style="background: var(--secondary-color);">Créer un compte</button>
+          <p class="switch-auth">Déjà inscrit ? <span id="btn-show-login">Se connecter</span></p>
+        </form>
+      </section>
+
+      <!-- Main App View -->
+      <section id="main-section" class="hidden">
+        <nav class="navbar glass-nav">
+          <h2>EcoCitoyen</h2>
+          <div class="nav-links">
+            <span id="citoyen-user-name" style="margin-right: 20px; font-weight: 600; color: var(--primary-color);"></span>
+            <button class="btn-text active" id="nav-map">Carte</button>
+            <button class="btn-text" id="nav-report">Nouveau Signalement</button>
+            <button class="btn-text" id="nav-education">Éducation</button>
+            <button class="btn-text" id="nav-logout">Déconnexion</button>
+          </div>
+        </nav>
+
+        <div class="content-container">
+          <!-- Carte -->
+          <div id="map-view" class="view active">
+            <div id="map"></div>
+          </div>
+
+          <!-- Formulaire de signalement -->
+          <div id="report-view" class="view hidden">
+            <div class="form-container glass-panel">
+              <h3>Signaler une anomalie</h3>
+              <p>Contribuez à la préservation de nos environnements.</p>
+              <form id="new-report-form">
+                <label>Type de problème</label>
+                <select id="report-type" required>
+                  <option value="pollution">Pollution</option>
+                  <option value="dechets">Déchets Sauvages</option>
+                  <option value="deforestation">Déforestation</option>
+                  <option value="autre">Autre</option>
+                </select>
+
+                <label>Description (optionnelle)</label>
+                <textarea id="report-description" rows="3" placeholder="Détaillez le problème observé..."></textarea>
+
+                <label>Photo du problème (Optionnelle)</label>
+                <div class="file-input-wrapper">
+                  <input type="file" id="report-image" accept="image/*" class="hidden-input" />
+                  <button type="button" id="btn-select-file" class="btn-secondary">Choisir une image</button>
+                  <span id="file-name-label">Aucun fichier choisi</span>
+                </div>
+                <div id="image-preview" class="hidden">
+                  <img src="" alt="Preview" id="preview-img" />
+                </div>
+
+                <label>Position (Automatique via GPS)</label>
+                <div class="location-box">
+                  <input type="text" id="report-lat" placeholder="Latitude" readonly />
+                  <input type="text" id="report-lng" placeholder="Longitude" readonly />
+                  <button type="button" id="btn-geolocate" class="btn-secondary">Localiser ma position</button>
+                </div>
+                
+                <button type="submit" class="btn-primary">Envoyer le signalement</button>
+              </form>
+            </div>
+          </div>
+
+          <!-- Education View -->
+          <div id="education-view" class="dashboard-content hidden">
+            <div class="header-banner">
+              <h3>Centre d'Éducation Environnementale</h3>
+              <p>Apprenez à mieux protéger nos ressources naturelles précieuses.</p>
+            </div>
+            <div id="articles-container" class="articles-grid">
+              <!-- Injecté via JS -->
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

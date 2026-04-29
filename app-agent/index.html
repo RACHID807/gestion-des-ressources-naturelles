@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portail Agent - Ressources Naturelles</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./style.css">
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  </head>
+  <body>
+    <div id="app">
+      <!-- Authentification View -->
+      <section id="auth-section" class="glass-panel active">
+        <div class="auth-header">
+          <h1>Portail Agent</h1>
+          <p>Gestion des interventions terrain.</p>
+        </div>
+        <form id="login-form">
+          <input type="text" id="agent-id" placeholder="Matricule Agent" required />
+          <input type="password" id="password" placeholder="Mot de passe" required />
+          <button type="submit" class="btn-primary">Connexion Sécurisée</button>
+        </form>
+      </section>
+
+      <!-- Main App View -->
+      <section id="main-section" class="hidden">
+        <nav class="navbar glass-nav">
+          <h2>Agent Terrain</h2>
+          <div class="nav-links">
+            <span id="agent-user-name" style="margin-right: 20px; font-weight: 600; color: var(--primary-color);"></span>
+            <button class="btn-text active" id="nav-missions">Mes Missions</button>
+            <button class="btn-text" id="nav-logout">Déconnexion</button>
+          </div>
+        </nav>
+
+        <div class="content-container">
+          <div class="header-banner">
+            <h3>Signalements en attente de traitement</h3>
+            <p>Mettez à jour le statut des anomalies signalées sur le terrain.</p>
+          </div>
+
+          <div class="missions-grid" id="missions-container">
+            <!-- Missions injectées via JS -->
+          </div>
+        </div>
+      </section>
+    </div>
+    
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
