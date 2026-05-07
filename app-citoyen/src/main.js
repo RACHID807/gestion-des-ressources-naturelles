@@ -1,3 +1,12 @@
+console.log("🚀 Portail Citoyen : Script chargé");
+
+// Gestionnaire d'erreurs global pour le débogage en production
+window.onerror = function(msg, url, lineNo, columnNo, error) {
+    console.error('Erreur Globale Citoyen:', msg, 'à', lineNo, ':', columnNo);
+    alert('Erreur au chargement du script Citoyen: ' + msg);
+    return false;
+};
+
 // Selectors
 const authSection = document.getElementById('auth-section');
 const mainSection = document.getElementById('main-section');
@@ -121,41 +130,56 @@ btnShowLogin.addEventListener('click', () => {
 
 registerForm.addEventListener('submit', async (e) => {
     e.preventDefault();
+    console.log("🔄 Événement register intercepté");
     const name = document.getElementById('reg-name').value;
     const email = document.getElementById('reg-email').value;
     const password = document.getElementById('reg-password').value;
     
+    console.log("📡 Tentative d'inscription pour :", email);
+
     try {
         const res = await fetch(`${API_URL}/auth/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, email, password })
         });
+        
+        console.log("📥 Réponse register reçue, status :", res.status);
         const data = await res.json();
         if(res.ok) {
+            console.log("✅ Inscription réussie !");
             showToast('Inscription réussie ! Vous pouvez vous connecter.');
             btnShowLogin.click(); // Switch back to login
             registerForm.reset();
         } else {
+            console.warn("❌ Échec inscription :", data.error);
             showToast(data.error || 'Erreur lors de l\'inscription', true);
         }
     } catch(err) {
+        console.error("🔥 Erreur critique inscription :", err);
         showToast('Erreur serveur', true);
     }
 });
 
 loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
+    console.log("🔄 Événement login intercepté (Citoyen)");
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
+    
+    console.log("📡 Tentative de connexion Citoyen pour :", email);
+
     try {
         const res = await fetch(`${API_URL}/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password })
         });
+
+        console.log("📥 Réponse login reçue, status :", res.status);
         const data = await res.json();
         if(res.ok) {
+            console.log("✅ Connexion Citoyen réussie !");
             localStorage.setItem('eco_token', data.token);
             localStorage.setItem('eco_user', JSON.stringify(data.user));
             document.getElementById('citoyen-user-name').textContent = data.user.name;
@@ -165,9 +189,11 @@ loginForm.addEventListener('submit', async (e) => {
             switchView('map');
             showToast('Connexion réussie ! Bienvenue ' + data.user.name);
         } else {
+            console.warn("❌ Échec connexion Citoyen :", data.error);
             showToast(data.error || 'Erreur identifiants', true);
         }
     } catch(err) {
+        console.error("🔥 Erreur critique connexion Citoyen :", err);
         showToast('Erreur de connexion serveur', true);
     }
 });

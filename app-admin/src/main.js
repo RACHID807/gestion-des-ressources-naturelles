@@ -1,3 +1,12 @@
+console.log("🚀 Portail Admin : Script chargé");
+
+// Gestionnaire d'erreurs global pour le débogage en production
+window.onerror = function(msg, url, lineNo, columnNo, error) {
+    console.error('Erreur Globale Admin:', msg, 'à', lineNo, ':', columnNo);
+    alert('Erreur au chargement du script Admin: ' + msg);
+    return false;
+};
+
 const authSection = document.getElementById('auth-section');
 const mainSection = document.getElementById('main-section');
 const loginForm = document.getElementById('login-form');
@@ -16,9 +25,21 @@ let agentsList = []; // Cache for assignment
 // --- SUPABASE REALTIME CONFIG ---
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://obrujgpbduzsenllwxgx.supabase.co';
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9icnVqZ3BiZHV6c2VubGx3eGd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjcxMjQsImV4cCI6MjA5Mjk0MzEyNH0.CW93l7Ki_IPyLha0fdg6SjmytKECskB3DDor2tRWBG8';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let supabase;
+try {
+    if (window.supabase && window.supabase.createClient) {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        console.log("✅ Supabase Admin initialisé avec succès");
+    } else {
+        console.error("❌ La bibliothèque Supabase Admin (CDN) n'est pas chargée");
+    }
+} catch (e) {
+    console.error("Erreur initialisation Supabase Admin:", e);
+}
 
 function initRealtime() {
+    if (!supabase) return console.warn("Supabase non initialisé, realtime désactivé");
     console.log("Connexion au flux Temps Réel...");
     supabase
         .channel('schema-db-changes')
@@ -38,41 +59,48 @@ function initRealtime() {
         .subscribe();
 }
 
-loginForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email = document.getElementById('admin-id').value;
-    const password = document.getElementById('password').value;
-    
-    console.log("Tentative de connexion vers :", `${API_URL}/auth/login`);
-
-    try {
-        const res = await fetch(`${API_URL}/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
-        });
+if (loginForm) {
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        console.log("🔄 Événement submit intercepté (Admin)");
+        const email = document.getElementById('admin-id').value;
+        const password = document.getElementById('password').value;
         
-        console.log("Réponse reçue, status :", res.status);
-        const data = await res.json();
-        if(res.ok) {
-            if (data.user.role !== 'admin') {
-                return alert("Accès réservé aux administrateurs");
+        console.log("📡 Tentative de connexion Admin pour :", email);
+
+        try {
+            const res = await fetch(`${API_URL}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            
+            console.log("📥 Réponse reçue Admin, status :", res.status);
+            const data = await res.json();
+            if(res.ok) {
+                if (data.user.role !== 'admin') {
+                    console.warn("🚫 Tentative de connexion non-admin rejetée");
+                    return alert("Accès réservé aux administrateurs");
+                }
+                console.log("✅ Connexion Admin réussie !");
+                localStorage.setItem('eco_token', data.token);
+                localStorage.setItem('eco_user', JSON.stringify(data.user));
+                document.getElementById('admin-user-name').textContent = data.user.name;
+                document.getElementById('admin-user-avatar').textContent = data.user.name.charAt(0).toUpperCase();
+                authSection.classList.replace('active', 'hidden');
+                mainSection.classList.replace('hidden', 'active');
+                loadDashboard();
+                initRealtime(); 
+            } else {
+                console.warn("❌ Échec connexion Admin :", data.error);
+                alert(data.error || "Erreur de connexion");
             }
-            localStorage.setItem('eco_token', data.token);
-            localStorage.setItem('eco_user', JSON.stringify(data.user));
-            document.getElementById('admin-user-name').textContent = data.user.name;
-            document.getElementById('admin-user-avatar').textContent = data.user.name.charAt(0).toUpperCase();
-            authSection.classList.replace('active', 'hidden');
-            mainSection.classList.replace('hidden', 'active');
-            loadDashboard();
-            initRealtime(); 
-        } else {
-            alert(data.error || "Erreur de connexion");
+        } catch(err) {
+            console.error("🔥 Erreur critique connexion Admin :", err);
+            alert("Erreur de connexion serveur");
         }
-    } catch(err) {
-        alert("Erreur de connexion serveur");
-    }
-});
+    });
+}
 
 navLogout.addEventListener('click', () => {
     localStorage.removeItem('eco_token');
