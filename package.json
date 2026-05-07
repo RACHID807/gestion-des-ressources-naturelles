@@ -5,5 +5,15 @@
   "scripts": {
     "postinstall": "npm install --prefix app-citoyen && npm install --prefix app-agent && npm install --prefix app-admin && npm install --prefix backend",
     "build": "npm run build --prefix app-citoyen && npm run build --prefix app-agent && npm run build --prefix app-admin && mkdir -p dist/app-citoyen dist/app-agent dist/app-admin && cp -r app-citoyen/dist/* dist/app-citoyen/ && cp -r app-agent/dist/* dist/app-agent/ && cp -r app-admin/dist/* dist/app-admin/ && cp index.html dist/ && cp style.css dist/"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.1.1",
+    "pg": "^8.20.0",
+    "sqlite3": "^5.1.7"
   }
 }
