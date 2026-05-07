@@ -16,8 +16,8 @@ app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Serve the frontend files from the parent directory
-app.use(express.static(path.join(__dirname, '../')));
+// Serve the frontend files - REMOVED for Vercel compatibility (handled by static-build)
+// app.use(express.static(path.join(__dirname, '../')));
 
 // Multer Config
 const storage = multer.diskStorage({
@@ -663,8 +663,12 @@ app.get('/api/extended-stats', authenticateToken, (req, res) => {
     });
 });
 
-app.listen(PORT, () => {
-    console.log(`Backend API v1 is running on http://localhost:${PORT}`);
-});
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, () => {
+        console.log(`Backend API v1 is running on http://localhost:${PORT}`);
+    });
+} else {
+    console.log("Backend API initialized for Production (Serverless)");
+}
 
 module.exports = app;
