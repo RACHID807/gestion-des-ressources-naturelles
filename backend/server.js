@@ -31,6 +31,14 @@ app.get('/api/status', (req, res) => {
     res.json({ status: 'Online', service: 'Ressources Naturelles API' });
 });
 
+// Database connection test
+app.get('/api/test-db', (req, res) => {
+    db.get("SELECT count(*) as count FROM users", (err, row) => {
+        if (err) return res.status(500).json({ error: "DB Connection failed", details: err.message });
+        res.json({ status: "connected", userCount: row ? row.count : 0 });
+    });
+});
+
 // --- AUTHENTICATION MIDDLEWARE ---
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
@@ -57,11 +65,13 @@ app.post('/api/auth/register', (req, res) => {
 // Login
 app.post('/api/auth/login', (req, res) => {
     const { email, password } = req.body;
-    console.log('Login attempt for email:', email);
+    console.log('--- LOGIN ATTEMPT ---');
+    console.log('Email:', email);
+    
     db.get("SELECT * FROM users WHERE email = $1", [email], (err, user) => {
         if (err) {
-            console.error('DB error on login:', err);
-            return res.status(500).json({ error: 'Database error' });
+            console.error('❌ DB error on login:', err.message);
+            return res.status(500).json({ error: 'Erreur base de données', details: err.message });
         }
         if (!user) {
             console.warn('User not found for email:', email);

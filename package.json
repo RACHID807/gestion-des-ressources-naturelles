@@ -1,0 +1,9 @@
+{
+  "name": "eco-citoyen-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "postinstall": "npm install --prefix app-citoyen && npm install --prefix app-agent && npm install --prefix app-admin && npm install --prefix backend",
+    "build": "npm run build --prefix app-citoyen && npm run build --prefix app-agent && npm run build --prefix app-admin && mkdir -p dist/app-citoyen dist/app-agent dist/app-admin && cp -r app-citoyen/dist/* dist/app-citoyen/ && cp -r app-agent/dist/* dist/app-agent/ && cp -r app-admin/dist/* dist/app-admin/ && cp index.html dist/ && cp style.css dist/"
+  }
+}

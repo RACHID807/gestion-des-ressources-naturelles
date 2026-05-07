@@ -42,11 +42,17 @@ loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = document.getElementById('admin-id').value;
     const password = document.getElementById('password').value;
+    
+    console.log("Tentative de connexion vers :", `${API_URL}/auth/login`);
+
     try {
         const res = await fetch(`${API_URL}/auth/login`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password })
         });
+        
+        console.log("Réponse reçue, status :", res.status);
         const data = await res.json();
         if(res.ok) {
             if (data.user.role !== 'admin') {
