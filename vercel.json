@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "name": "eco-citoyen-ci",
+  "builds": [
+    { "src": "backend/server.js", "use": "@vercel/node" },
+    { "src": "app-admin/**/*", "use": "@vercel/static" },
+    { "src": "app-citoyen/**/*", "use": "@vercel/static" },
+    { "src": "app-agent/**/*", "use": "@vercel/static" },
+    { "src": "index.html", "use": "@vercel/static" },
+    { "src": "style.css", "use": "@vercel/static" }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "backend/server.js" },
+    { "src": "/app-admin/(.*)", "dest": "/app-admin/$1" },
+    { "src": "/app-citoyen/(.*)", "dest": "/app-citoyen/$1" },
+    { "src": "/app-agent/(.*)", "dest": "/app-agent/$1" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
+}

@@ -43,6 +43,8 @@
             <span id="citoyen-user-name" style="margin-right: 20px; font-weight: 600; color: var(--primary-color);"></span>
             <button class="btn-text active" id="nav-map">Carte</button>
             <button class="btn-text" id="nav-report">Nouveau Signalement</button>
+            <button class="btn-text" id="nav-activities">Mes Activités</button>
+            <button class="btn-text" id="nav-impact">Impact & Transparence</button>
             <button class="btn-text" id="nav-education">Éducation</button>
             <button class="btn-text" id="nav-logout">Déconnexion</button>
           </div>
@@ -61,12 +63,17 @@
               <p>Contribuez à la préservation de nos environnements.</p>
               <form id="new-report-form">
                 <label>Type de problème</label>
-                <select id="report-type" required>
-                  <option value="pollution">Pollution</option>
-                  <option value="dechets">Déchets Sauvages</option>
-                  <option value="deforestation">Déforestation</option>
-                  <option value="autre">Autre</option>
-                </select>
+                <div style="position: relative;">
+                  <select id="report-type" required>
+                    <option value="pollution">Pollution</option>
+                    <option value="dechets">Déchets Sauvages</option>
+                    <option value="deforestation">Déforestation</option>
+                    <option value="autre">Autre</option>
+                  </select>
+                  <div id="ai-badge" class="hidden" style="position: absolute; right: 10px; top: 10px; background: var(--secondary-color); color: white; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 800; animation: pulse 2s infinite;">
+                    🤖 Analyse IA...
+                  </div>
+                </div>
 
                 <label>Description (optionnelle)</label>
                 <textarea id="report-description" rows="3" placeholder="Détaillez le problème observé..."></textarea>
@@ -93,8 +100,56 @@
             </div>
           </div>
 
+          <!-- Activities View -->
+          <div id="activities-view" class="view hidden">
+            <div class="header-banner" style="background: linear-gradient(135deg, #27ae60, #2ecc71); margin-bottom: 20px;">
+              <h3>Mes Actions pour la Nature</h3>
+              <div id="eco-score-badge" class="glass" style="display: inline-block; padding: 10px 20px; border-radius: 50px; margin-top: 10px; font-weight: 800;">
+                🌱 <span id="total-points">0</span> ECO-POINTS
+              </div>
+            </div>
+            
+            <div class="activities-container">
+              <h4>Historique de mes signalements</h4>
+              <div id="my-reports-list" class="reports-grid">
+                <!-- Injecté via JS -->
+              </div>
+            </div>
+
+            <div class="rewards-container" style="margin-top: 30px;">
+              <h4>Mes Badges & Récompenses</h4>
+              <div id="my-badges-list" class="badges-grid" style="display: flex; gap: 15px; flex-wrap: wrap;">
+                <!-- Injecté via JS -->
+              </div>
+            </div>
+          </div>
+
+            </div>
+          </div>
+
+          <!-- Impact View (Before/After) -->
+          <div id="impact-view" class="view hidden">
+            <div class="header-banner" style="background: linear-gradient(135deg, #FF8200, #E67600); margin-bottom: 30px;">
+              <h3>Impact & Transparence</h3>
+              <p>Découvrez l'impact concret de vos signalements et l'état de nos infrastructures intelligentes.</p>
+            </div>
+            
+            <div style="margin-bottom: 40px;">
+              <h4 style="color: var(--primary-color); margin-bottom: 20px;">🌐 Nos Infrastructures Intelligentes (Temps Réel)</h4>
+              <div class="reports-grid" id="community-stats-container">
+                <!-- Injecté via JS -->
+                <p>Chargement des données communautaires...</p>
+              </div>
+            </div>
+
+            <h4 style="color: var(--primary-color); margin-bottom: 20px;">📸 Victoires Récentes</h4>
+            <div id="impact-gallery" class="reports-grid">
+              <!-- Injecté via JS -->
+            </div>
+          </div>
+
           <!-- Education View -->
-          <div id="education-view" class="dashboard-content hidden">
+          <div id="education-view" class="view hidden">
             <div class="header-banner">
               <h3>Centre d'Éducation Environnementale</h3>
               <p>Apprenez à mieux protéger nos ressources naturelles précieuses.</p>
@@ -102,9 +157,34 @@
             <div id="articles-container" class="articles-grid">
               <!-- Injecté via JS -->
             </div>
+
+            <div class="quizzes-section" style="margin-top: 40px;">
+              <h4 style="color: var(--primary-color); margin-bottom: 20px;">🏆 Défis & Quiz Éco-Responsables</h4>
+              <div id="quizzes-container" class="articles-grid">
+                <!-- Injecté via JS -->
+              </div>
+            </div>
           </div>
         </div>
       </section>
+    </div>
+
+    <!-- Quiz Modal -->
+    <div id="quiz-modal" class="modal-overlay hidden">
+        <div class="modal-content glass" style="max-width: 600px; text-align: left;">
+            <h3 id="quiz-title">Quiz</h3>
+            <div id="quiz-question-container">
+                <p id="question-text" style="font-size: 1.1rem; font-weight: 600; margin-bottom: 20px;"></p>
+                <div id="options-container" style="display: flex; flex-direction: column; gap: 10px;">
+                    <!-- Options injectées -->
+                </div>
+            </div>
+            <div id="quiz-results" class="hidden" style="text-align: center;">
+                <h4 id="result-score" style="font-size: 2rem; color: var(--secondary-color);">Score: 0%</h4>
+                <p id="result-message"></p>
+                <button class="btn-primary" onclick="closeQuiz()">Continuer</button>
+            </div>
+        </div>
     </div>
 
     <!-- Leaflet JS -->

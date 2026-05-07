@@ -1,12 +1,21 @@
 :root {
   --primary-color: #FF8200;   /* Orange CI */
+  --primary-gradient: linear-gradient(135deg, #FF8200 0%, #FFB347 100%);
   --secondary-color: #009E60; /* Vert CI */
-  --accent-color: #FF8200;
-  --bg-color: #f9fbf9;
-  --sidebar-bg: #1a1a1a;
-  --text-light: #ffffff;
-  --text-dark: #2c3e50;
+  --secondary-gradient: linear-gradient(135deg, #009E60 0%, #27ae60 100%);
+  --accent-color: #ffffff;
+  --bg-color: #f0f4f8;
+  --sidebar-bg: #111827;
+  --card-bg: rgba(255, 255, 255, 0.8);
+  --text-light: #f3f4f6;
+  --text-dark: #1f2937;
+  --text-muted: #6b7280;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.3);
 }
 
 * {
@@ -70,18 +79,31 @@ input {
 .btn-primary {
   width: 100%;
   padding: 15px;
-  background: var(--primary-color);
+  background: var(--primary-gradient);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 1.1rem;
-  font-weight: bold;
+  font-weight: 700;
   cursor: pointer;
   transition: var(--transition);
+  box-shadow: var(--shadow-md);
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 .btn-primary:hover {
-  background: var(--secondary-color);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  filter: brightness(1.1);
+}
+
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-lg);
 }
 
 /* Main Section */
@@ -122,9 +144,10 @@ input {
 
 .sidebar ul li:hover,
 .sidebar ul li.active {
-  background: rgba(255, 130, 0, 0.1);
+  background: rgba(255, 130, 0, 0.15);
   color: var(--primary-color);
   border-left-color: var(--primary-color);
+  padding-left: 35px;
 }
 
 .content-area {
@@ -174,47 +197,59 @@ input {
 }
 
 .stat-card {
-  background: white;
-  padding: 30px;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  background: var(--card-bg);
+  padding: 25px;
+  border-radius: 16px;
+  box-shadow: var(--shadow-md);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  transition: var(--transition);
+}
+
+.stat-card:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-lg);
 }
 
 .stat-card h4 {
-  color: #7f8c8d;
-  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
   margin-bottom: 10px;
   text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 .stat-card .value {
-  font-size: 2.5rem;
-  font-weight: bold;
+  font-size: 2.2rem;
+  font-weight: 800;
   color: var(--text-dark);
   margin-bottom: 5px;
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .trend {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 
 .trend.positive {
-  color: #27ae60;
+  color: #10b981;
 }
 
 .trend.negative {
-  color: #e74c3c;
+  color: #ef4444;
 }
 
 .trend.neutral {
-  color: #95a5a6;
+  color: var(--text-muted);
 }
 
 .recent-reports-panel {
   background: white;
   padding: 30px;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  border-radius: 16px;
+  box-shadow: var(--shadow-md);
 }
 
 .recent-reports-panel h4 {
@@ -327,4 +362,112 @@ input {
 
 .btn-small.primary:hover {
   background: #2980b9;
+}
+
+/* Coordination Chat Styles */
+.note-bubble {
+  background: #f3f4f6;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 10px;
+  position: relative;
+  border-left: 4px solid var(--secondary-color);
+  animation: slideIn 0.3s ease-out;
+  text-align: left;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.note-bubble .meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+  font-weight: 700;
+}
+
+/* PRINT STYLES FOR PDF EXPORT */
+@media print {
+  @page {
+    size: A4;
+    margin: 2cm;
+  }
+  
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  body * { visibility: hidden; }
+  
+  #details-modal, #details-modal * { visibility: visible; }
+  
+  #details-modal { 
+    position: fixed !important; 
+    left: 0 !important; 
+    top: 0 !important; 
+    width: 100% !important; 
+    height: 100% !important;
+    box-shadow: none !important;
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    z-index: 99999;
+  }
+
+  .modal-overlay { 
+    background: white !important; 
+    position: absolute !important; 
+    backdrop-filter: none !important;
+  }
+
+  .modal-actions, .internal-notes-section, .btn-primary, .btn-secondary, .btn-small { 
+    display: none !important; 
+  }
+  
+  .modal-content {
+    border: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+
+  h3 { 
+    color: #009E60 !important; 
+    border-bottom: 3px solid #FF8200 !important;
+    padding-bottom: 15px;
+    margin-bottom: 30px;
+    text-transform: uppercase;
+    text-align: center;
+  }
+
+  strong { color: #111827 !important; }
+  
+  .badge {
+    border: 1px solid #ddd !important;
+    padding: 4px 8px !important;
+    border-radius: 4px !important;
+  }
+
+  /* Footer for official look */
+  #details-modal::after {
+    content: "Document généré par le Système de Gestion des Ressources Naturelles - République de Côte d'Ivoire";
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    text-align: center;
+    font-size: 0.8rem;
+    color: #999;
+    border-top: 1px solid #eee;
+    padding-top: 10px;
+  }
+  
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }

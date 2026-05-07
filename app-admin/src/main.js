@@ -8,13 +8,14 @@ const addAgentForm = document.getElementById('add-agent-form');
 
 const API_URL = '/api';
 let statusChartInstance = null;
+let typeChartInstance = null;
 let adminMap = null;
 let markerLayer = null;
 let agentsList = []; // Cache for assignment
 
 // --- SUPABASE REALTIME CONFIG ---
-const SUPABASE_URL = 'https://obrujgpbduzsenllwxgx.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9icnVqZ3BiZHV6c2VubGx3eGd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjcxMjQsImV4cCI6MjA5Mjk0MzEyNH0.CW93l7Ki_IPyLha0fdg6SjmytKECskB3DDor2tRWBG8';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://obrujgpbduzsenllwxgx.supabase.co';
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9icnVqZ3BiZHV6c2VubGx3eGd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjcxMjQsImV4cCI6MjA5Mjk0MzEyNH0.CW93l7Ki_IPyLha0fdg6SjmytKECskB3DDor2tRWBG8';
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 function initRealtime() {
@@ -109,6 +110,21 @@ navItems.forEach(item => {
             } else if(item.id === 'nav-users') {
                 document.getElementById('users-view').classList.remove('hidden');
                 loadUsers();
+            } else if(item.id === 'nav-water') {
+                document.getElementById('water-view').classList.remove('hidden');
+                loadWaterResources();
+            } else if(item.id === 'nav-mining') {
+                document.getElementById('mining-view').classList.remove('hidden');
+                loadMiningSites();
+            } else if(item.id === 'nav-energy') {
+                document.getElementById('energy-view').classList.remove('hidden');
+                loadEnergyResources();
+            } else if(item.id === 'nav-oil') {
+                document.getElementById('oil-view').classList.remove('hidden');
+                loadOilFields();
+            } else if(item.id === 'nav-sensors') {
+                document.getElementById('sensors-view').classList.remove('hidden');
+                loadSensors();
             } else if(item.id === 'nav-leaderboard') {
                 document.getElementById('leaderboard-view').classList.remove('hidden');
                 loadLeaderboard();
@@ -137,11 +153,17 @@ async function loadDashboard() {
 
         // Update Stat Cards (with querySelector fallback for simplicity)
         const values = document.querySelectorAll('.stat-card .value');
-        if(values.length >= 4) {
+        if(values.length >= 10) {
             values[0].textContent = stats.totalReports || 0;
             values[1].textContent = stats.pendingReports || 0;
             values[2].textContent = stats.activeAgents || 0;
             values[3].textContent = stats.totalResources || 0;
+            values[4].textContent = stats.totalSensors || 0;
+            values[5].textContent = `${(stats.totalCarbonSaved / 1000).toFixed(1)}t` || '0t';
+            values[6].textContent = stats.totalWaterResources || 0;
+            values[7].textContent = stats.pollutedWater || 0;
+            values[8].textContent = stats.totalMiningSites || 0;
+            values[9].textContent = stats.totalOilFields || 0;
         }
 
         // Fetch Agents for assignment
@@ -150,11 +172,105 @@ async function loadDashboard() {
         agentsList = users.filter(u => u.role === 'agent');
 
         renderTable(reports);
-        renderChart(reports);
+        renderCharts(reports, stats);
         renderAdminMap(reports);
 
     } catch(err) {
         console.error("Dashboard Load Error", err);
+    }
+}
+
+// renderCharts moved to the bottom
+
+async function renderAdminMap(reports) {
+    if (!adminMap) {
+        adminMap = L.map('admin-map').setView([7.54, -5.5471], 7);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap contributors', maxZoom: 20
+        }).addTo(adminMap);
+    }
+
+    // Clear previous markers
+    if (markerLayer) adminMap.removeLayer(markerLayer);
+    markerLayer = L.layerGroup().addTo(adminMap);
+
+    // Add reports
+    const redIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png', iconSize: [25, 41] });
+    const orangeIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-orange.png', iconSize: [25, 41] });
+    const greenIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png', iconSize: [25, 41] });
+
+    reports.forEach(rep => {
+        if (rep.latitude && rep.longitude) {
+            let icon = redIcon;
+            if (rep.status === 'en cours') icon = orangeIcon;
+            else if (rep.status === 'Traité') icon = greenIcon;
+
+            const marker = L.marker([rep.latitude, rep.longitude], { icon }).addTo(markerLayer);
+            marker.bindPopup(`
+                <div style="font-family: 'Outfit', sans-serif;">
+                    <b style="color: var(--secondary-color);">#${rep.id} - ${rep.type}</b><br>
+                    <span style="font-size: 0.8rem; color: #666;">Statut: ${rep.status}</span><br>
+                    <p style="margin-top: 5px; font-size: 0.9rem;">${rep.description || 'Pas de description'}</p>
+                    ${rep.image_url ? `<img src="${rep.image_url}" style="width: 100%; max-width: 200px; border-radius: 4px; margin-top: 10px;" />` : ''}
+                </div>
+            `);
+        }
+    });
+
+    // Add sensors
+    try {
+        const token = localStorage.getItem('eco_token');
+        const res = await fetch(`${API_URL}/sensors`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const { data: sensors } = await res.json();
+        
+        sensors.forEach(sensor => {
+            const sensorIcon = L.icon({ 
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png', 
+                iconSize: [25, 41] 
+            });
+            const marker = L.marker([sensor.latitude, sensor.longitude], { icon: sensorIcon }).addTo(markerLayer);
+            const lastReading = sensor.last_reading ? JSON.parse(sensor.last_reading) : {};
+            marker.bindPopup(`<b>Capteur: ${sensor.type}</b><br>${sensor.location_name}<br>Dernière lecture: ${JSON.stringify(lastReading)}`);
+        });
+
+        // Add water resources
+        const waterRes = await fetch(`${API_URL}/water-resources`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const { data: waters } = await waterRes.json();
+        waters.forEach(water => {
+            const waterIcon = L.icon({ 
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-cyan.png', 
+                iconSize: [25, 41] 
+            });
+            const marker = L.marker([water.latitude, water.longitude], { icon: waterIcon }).addTo(markerLayer);
+            marker.bindPopup(`<b>Eau: ${water.name}</b><br>Type: ${water.type}<br>Statut: ${water.status}<br>Pollution: ${water.pollution_level}`);
+        });
+
+        // Add mining sites
+        const miningRes = await fetch(`${API_URL}/mining-sites`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const { data: minings } = await miningRes.json();
+        minings.forEach(site => {
+            const miningIcon = L.icon({ 
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-grey.png', 
+                iconSize: [25, 41] 
+            });
+            const marker = L.marker([site.latitude, site.longitude], { icon: miningIcon }).addTo(markerLayer);
+            marker.bindPopup(`<b>Mine: ${site.name}</b><br>Ressource: ${site.resource_type}<br>Extraction: ${site.extraction_rate}t/mois<br>Impact: ${site.environmental_impact}`);
+        });
+
+        // Add oil fields
+        const oilRes = await fetch(`${API_URL}/oil-fields`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const { data: oils } = await oilRes.json();
+        oils.forEach(field => {
+            const oilIcon = L.icon({ 
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-orange.png', 
+                iconSize: [25, 41] 
+            });
+            const marker = L.marker([field.latitude, field.longitude], { icon: oilIcon }).addTo(markerLayer);
+            marker.bindPopup(`<b>Pétrole: ${field.name}</b><br>Type: ${field.type}<br>Production: ${field.production_rate} barils/jour<br>Risque fuite: ${field.leak_risk}`);
+        });
+
+    } catch(err) {
+        console.error("Error loading resources for map", err);
     }
 }
 
@@ -315,34 +431,200 @@ window.showReportDetails = async (reportId) => {
                     <p style="color: #2c3e50; font-weight: 500;">${report.agent_feedback || '<i>En attente du retour...</i>'}</p>
                 </div>
 
-                ${report.status === 'Traité' && !report.admin_rating ? `
-                    <div style="background: #e8f5e9; padding: 15px; border-radius: 8px; border: 1px solid #c8e6c9;">
-                        <h5 style="color: #2e7d32; margin-bottom: 10px;">⭐ Noter cette intervention</h5>
-                        <div style="display: flex; gap: 15px; align-items: center;">
-                            <select id="rate-value" class="modern-select" style="margin-bottom:0; width: 150px;">
-                                <option value="5">5 Étoiles (Excellent)</option>
-                                <option value="4">4 Étoiles (Très bien)</option>
-                                <option value="3">3 Étoiles (Moyen)</option>
-                                <option value="2">2 Étoiles (Insuffisant)</option>
-                                <option value="1">1 Étoile (Médiocre)</option>
-                            </select>
-                            <input type="number" id="impact-value" placeholder="Score Impact (0-100)" class="modern-select" style="margin-bottom:0; width: 180px;" />
-                            <button class="btn-primary" onclick="rateMission(${report.id})" style="width: auto;">Valider la Note</button>
-                        </div>
+                <div class="internal-notes-section" style="margin-bottom: 20px;">
+                    <h5 style="color: #607d8b; border-bottom: 1px solid #ddd; padding-bottom: 5px;">📔 Notes Internes (Confidentiel)</h5>
+                    <div id="notes-list-${report.id}" style="max-height: 150px; overflow-y: auto; margin: 10px 0; font-size: 0.85rem;">
+                        Chargement des notes...
                     </div>
-                ` : report.admin_rating ? `
-                    <div style="text-align: center; padding: 10px; background: #f1f1f1; border-radius: 8px;">
-                        <p>Note Admin : <b>${report.admin_rating}/5</b> | Score Impact : <b>${report.impact_score} pts</b></p>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="new-note-${report.id}" placeholder="Ajouter une note de coordination..." class="modern-select" style="margin-bottom:0; flex:1;" />
+                        <button class="btn-primary" onclick="addInternalNote(${report.id})" style="width: auto;">Note</button>
                     </div>
-                ` : ''}
+                </div>
 
-                <div class="modal-actions" style="justify-content: flex-end; margin-top: 20px;">
-                    <button class="btn-primary" onclick="document.getElementById('details-modal').remove()">Fermer</button>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px;">
+                    <button class="btn-secondary" onclick="exportReportPDF(${report.id})" style="width: auto;">📄 Export PDF</button>
+                    <button class="btn-primary" onclick="document.getElementById('details-modal').remove()" style="width: auto;">Fermer</button>
                 </div>
             </div>
         </div>
     `;
     document.body.insertAdjacentHTML('beforeend', modalHtml);
+    loadInternalNotes(report.id);
+};
+
+window.loadInternalNotes = async (reportId) => {
+    const container = document.getElementById(`notes-list-${reportId}`);
+    try {
+        const token = localStorage.getItem('eco_token');
+        const res = await fetch(`${API_URL}/reports/${reportId}/notes`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const { data: notes } = await res.json();
+        
+        if (notes.length === 0) {
+            container.innerHTML = '<p style="color: #999; font-style: italic;">Aucune note pour le moment.</p>';
+            return;
+        }
+
+        container.innerHTML = notes.map(n => `
+            <div class="note-bubble">
+                <div class="meta">
+                    <span>👤 ${n.user_name}</span>
+                    <span>${new Date(n.created_at).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}</span>
+                </div>
+                <div style="font-size: 0.9rem; line-height: 1.4;">${n.content}</div>
+            </div>
+        `).join('');
+    } catch(e) { container.innerHTML = 'Erreur chargement notes'; }
+};
+
+window.addInternalNote = async (reportId) => {
+    const input = document.getElementById(`new-note-${reportId}`);
+    const content = input.value;
+    if (!content) return;
+
+    try {
+        const token = localStorage.getItem('eco_token');
+        const res = await fetch(`${API_URL}/reports/${reportId}/notes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ content })
+        });
+        if (res.ok) {
+            input.value = '';
+            loadInternalNotes(reportId);
+        }
+    } catch(e) {}
+};
+
+window.exportReportPDF = (reportId) => {
+    // We add a class to body just in case, though the @media print handles most
+    window.print();
+};
+
+// --- NEW RESOURCE LOADING FUNCTIONS ---
+async function loadWaterResources() {
+    const tableBody = document.getElementById('water-resources-table');
+    tableBody.innerHTML = '<tr><td colspan="7">Chargement...</td></tr>';
+    try {
+        const token = localStorage.getItem('eco_token');
+        const res = await fetch(`${API_URL}/water-resources`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const { data } = await res.json();
+        tableBody.innerHTML = data.map(w => {
+            const smartBtnClass = w.smart_meter_active ? 'btn-primary' : 'btn-secondary';
+            const smartBtnText = w.smart_meter_active ? '✅ Smart On' : '❌ Smart Off';
+            return `
+            <tr>
+                <td>${w.id}</td>
+                <td>${w.name}</td>
+                <td>${w.type}</td>
+                <td><span class="badge ${w.status === 'clean' ? 'status-completed' : 'status-pending'}">${w.status}</span></td>
+                <td>${w.pollution_level}</td>
+                <td>${w.recycling_rate}%</td>
+                <td><button class="btn-small ${smartBtnClass}" onclick="toggleSmartMeter(${w.id})">${smartBtnText}</button></td>
+            </tr>
+        `}).join('');
+    } catch(e) { tableBody.innerHTML = '<tr><td colspan="7">Erreur chargement</td></tr>'; }
+}
+
+async function loadMiningSites() {
+    const tableBody = document.getElementById('mining-sites-table');
+    tableBody.innerHTML = '<tr><td colspan="7">Chargement...</td></tr>';
+    try {
+        const token = localStorage.getItem('eco_token');
+        const res = await fetch(`${API_URL}/mining-sites`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const { data } = await res.json();
+        tableBody.innerHTML = data.map(m => {
+            const bioBtnClass = m.bioleaching_active ? 'btn-primary' : 'btn-secondary';
+            const bioBtnText = m.bioleaching_active ? '✅ Active' : '❌ Inactive';
+            const complianceColor = m.compliance_score >= 80 ? '#27ae60' : (m.compliance_score >= 50 ? '#f39c12' : '#e74c3c');
+            return `
+            <tr>
+                <td>${m.id}</td>
+                <td>${m.name}</td>
+                <td>${m.resource_type}</td>
+                <td>${m.extraction_rate}</td>
+                <td>${m.environmental_impact}</td>
+                <td style="color:${complianceColor}; font-weight:bold;">${m.compliance_score}/100</td>
+                <td><button class="btn-small ${bioBtnClass}" onclick="toggleBioleaching(${m.id})">${bioBtnText}</button></td>
+            </tr>
+        `}).join('');
+    } catch(e) { tableBody.innerHTML = '<tr><td colspan="7">Erreur chargement</td></tr>'; }
+}
+
+async function loadOilFields() {
+    const tableBody = document.getElementById('oil-fields-table');
+    tableBody.innerHTML = '<tr><td colspan="6">Chargement...</td></tr>';
+    try {
+        const token = localStorage.getItem('eco_token');
+        const res = await fetch(`${API_URL}/oil-fields`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const { data } = await res.json();
+        tableBody.innerHTML = data.map(o => `
+            <tr>
+                <td>${o.id}</td>
+                <td>${o.name}</td>
+                <td>${o.type}</td>
+                <td>${o.production_rate}</td>
+                <td>${o.leak_risk}</td>
+                <td>${o.carbon_emissions} kg</td>
+            </tr>
+        `).join('');
+    } catch(e) { tableBody.innerHTML = '<tr><td colspan="6">Erreur chargement</td></tr>'; }
+}
+
+async function loadEnergyResources() {
+    const tableBody = document.getElementById('energy-resources-table');
+    if (!tableBody) return;
+    tableBody.innerHTML = '<tr><td colspan="6">Chargement...</td></tr>';
+    try {
+        const token = localStorage.getItem('eco_token');
+        const res = await fetch(`${API_URL}/energy-resources`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const { data } = await res.json();
+        tableBody.innerHTML = data.map(e => {
+            const gridBtnClass = e.smart_grid_active ? 'btn-primary' : 'btn-secondary';
+            const gridBtnText = e.smart_grid_active ? '✅ Connecté' : '❌ Isolé';
+            const batteryColor = e.battery_level > 50 ? '#27ae60' : '#e74c3c';
+            return `
+            <tr>
+                <td>${e.id}</td>
+                <td>${e.name}</td>
+                <td>${e.type}</td>
+                <td>${e.capacity_mw}</td>
+                <td>
+                    <div style="width:100%; background:#ddd; border-radius:10px; height:10px; margin-top:5px;">
+                        <div style="width:${e.battery_level}%; background:${batteryColor}; height:100%; border-radius:10px;"></div>
+                    </div>
+                    <small>${e.battery_level}%</small>
+                </td>
+                <td><button class="btn-small ${gridBtnClass}" onclick="toggleSmartGrid(${e.id})">${gridBtnText}</button></td>
+            </tr>
+        `}).join('');
+    } catch(e) { tableBody.innerHTML = '<tr><td colspan="6">Erreur chargement</td></tr>'; }
+}
+
+window.toggleSmartMeter = async (id) => {
+    try {
+        const token = localStorage.getItem('eco_token');
+        await fetch(`${API_URL}/water-resources/${id}/toggle-smart-meter`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } });
+        loadWaterResources();
+    } catch(e) {}
+};
+
+window.toggleBioleaching = async (id) => {
+    try {
+        const token = localStorage.getItem('eco_token');
+        await fetch(`${API_URL}/mining-sites/${id}/toggle-bioleaching`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } });
+        loadMiningSites();
+    } catch(e) {}
+};
+
+window.toggleSmartGrid = async (id) => {
+    try {
+        const token = localStorage.getItem('eco_token');
+        await fetch(`${API_URL}/energy-resources/${id}/toggle-smart-grid`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } });
+        loadEnergyResources();
+    } catch(e) {}
 };
 
 window.rateMission = async (reportId) => {
@@ -438,97 +720,125 @@ if(addArticleForm) {
     });
 }
 
-function renderChart(reports) {
-    const ctx = document.getElementById('statusChart').getContext('2d');
+function renderCharts(reports, stats) {
+    const statusCtx = document.getElementById('statusChart').getContext('2d');
+    const typeCtx = document.getElementById('typeChart').getContext('2d');
     
-    let chartData = { attente: 0, cours: 0, traite: 0 };
+    // Status Chart
+    let statusData = { attente: 0, cours: 0, traite: 0 };
     reports.forEach(r => {
-        if(r.status === 'en attente') chartData.attente++;
-        else if(r.status === 'en cours') chartData.cours++;
-        else chartData.traite++;
+        if(r.status === 'en attente') statusData.attente++;
+        else if(r.status === 'en cours') statusData.cours++;
+        else statusData.traite++;
     });
 
     if(statusChartInstance) {
-        statusChartInstance.data.datasets[0].data = [chartData.attente, chartData.cours, chartData.traite];
+        statusChartInstance.data.datasets[0].data = [statusData.attente, statusData.cours, statusData.traite];
         statusChartInstance.update();
     } else {
-        statusChartInstance = new Chart(ctx, {
+        statusChartInstance = new Chart(statusCtx, {
             type: 'bar',
             data: {
                 labels: ['En attente', 'En cours', 'Traité'],
                 datasets: [{
-                    label: 'Nombre de Signalements',
-                    data: [chartData.attente, chartData.cours, chartData.traite],
-                    backgroundColor: ['#e74c3c', '#f39c12', '#27ae60'],
-                    borderWidth: 0,
-                    borderRadius: 5
+                    label: 'Signalements',
+                    data: [statusData.attente, statusData.cours, statusData.traite],
+                    backgroundColor: [
+                        'rgba(231, 76, 60, 0.8)', 
+                        'rgba(243, 156, 18, 0.8)', 
+                        'rgba(39, 174, 96, 0.8)'
+                    ],
+                    borderColor: ['#e74c3c', '#f39c12', '#27ae60'],
+                    borderWidth: 1,
+                    borderRadius: 8
                 }]
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: { beginAtZero: true, grid: { borderDash: [5, 5] } },
-                    x: { grid: { display: false } }
+            options: { 
+                responsive: true, 
+                plugins: { 
+                    legend: { display: false } 
                 },
-                plugins: { legend: { display: false } }
+                scales: {
+                    y: { beginAtZero: true, grid: { display: false } },
+                    x: { grid: { display: false } }
+                }
             }
         });
     }
+
+    // Type Chart
+    if (stats && stats.byType) {
+        const labels = stats.byType.map(t => t.type);
+        const values = stats.byType.map(t => t.count);
+
+        if(typeChartInstance) {
+            typeChartInstance.data.labels = labels;
+            typeChartInstance.data.datasets[0].data = values;
+            typeChartInstance.update();
+        } else {
+            typeChartInstance = new Chart(typeCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: [
+                            '#FF8200', 
+                            '#009E60', 
+                            '#3498db', 
+                            '#9b59b6', 
+                            '#e67e22',
+                            '#1abc9c'
+                        ],
+                        borderWidth: 0,
+                        hoverOffset: 10
+                    }]
+                },
+                options: { 
+                    responsive: true, 
+                    cutout: '70%',
+                    plugins: {
+                        legend: { position: 'bottom', labels: { usePointStyle: true, padding: 20 } }
+                    }
+                }
+            });
+        }
+    }
 }
 
-function renderAdminMap(reports) {
-    if (!adminMap) {
-        adminMap = L.map('admin-map').setView([7.54, -5.5471], 7);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; OpenStreetMap contributors'
-        }).addTo(adminMap);
-        markerLayer = L.layerGroup().addTo(adminMap);
-    } else {
-        markerLayer.clearLayers();
-    }
+async function loadSensors() {
+    const tableBody = document.getElementById('sensors-table');
+    tableBody.innerHTML = '<tr><td colspan="6">Chargement...</td></tr>';
+    try {
+        const token = localStorage.getItem('eco_token');
+        const res = await fetch(`${API_URL}/sensors`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const { data } = await res.json();
+        tableBody.innerHTML = data.map(s => {
+            let readingStr = "Aucune";
+            if (s.last_reading) {
+                try {
+                    const r = JSON.parse(s.last_reading);
+                    readingStr = Object.entries(r).map(([k,v]) => `<b>${k}</b>: ${v}`).join(', ');
+                } catch(e) {}
+            }
+            
+            let status = '<span class="badge status-completed">Actif</span>';
+            if (s.carbon_baseline > 0 && readingStr !== "Aucune" && readingStr.includes("pm25") && JSON.parse(s.last_reading).pm25 > s.carbon_baseline) {
+                 status = '<span class="badge status-pending" style="background:#e74c3c;">Alerte</span>';
+            }
 
-    const redIcon = L.icon({
-        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-        iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
-    });
-    const orangeIcon = L.icon({
-        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-orange.png',
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-        iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
-    });
-    const greenIcon = L.icon({
-        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-        iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
-    });
-
-    reports.forEach(rep => {
-        if (rep.latitude && rep.longitude) {
-            let icon = redIcon;
-            if (rep.status === 'en cours') icon = orangeIcon;
-            else if (rep.status === 'Traité') icon = greenIcon;
-
-            const marker = L.marker([rep.latitude, rep.longitude], { icon }).addTo(markerLayer);
-            marker.bindPopup(`
-                <div style="font-family: 'Outfit', sans-serif;">
-                    <b style="color: var(--secondary-color);">#${rep.id} - ${rep.type}</b><br>
-                    <span style="font-size: 0.8rem; color: #666;">Statut: ${rep.status}</span><br>
-                    <p style="margin-top: 5px; font-size: 0.9rem;">${rep.description || 'Pas de description'}</p>
-                    ${rep.image_url ? `<img src="http://localhost:3000${rep.image_url}" style="width: 100%; max-width: 200px; border-radius: 4px; margin-top: 10px;" />` : ''}
-                </div>
-            `);
-        }
-    });
-
-    // Optionnel: Ajuster la vue pour englober tous les marqueurs si présent
-    if (reports.length > 0) {
-        const group = new L.featureGroup(markerLayer.getLayers());
-        if (group.getBounds().isValid()) {
-            adminMap.fitBounds(group.getBounds(), { padding: [30, 30] });
-        }
-    }
+            return `
+            <tr>
+                <td>${s.id}</td>
+                <td style="font-weight:600; color:var(--secondary-color);">${s.type}</td>
+                <td>${s.location_name}</td>
+                <td><div style="background:#f0f7f0; padding:4px; border-radius:4px; font-size:0.85rem;">${readingStr}</div></td>
+                <td>${s.carbon_baseline}</td>
+                <td>${status}</td>
+            </tr>
+            `;
+        }).join('');
+    } catch(e) { tableBody.innerHTML = '<tr><td colspan="6">Erreur chargement</td></tr>'; }
 }
 
 function loadAllReportsView() {

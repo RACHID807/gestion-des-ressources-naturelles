@@ -33,19 +33,33 @@
           <div class="nav-links">
             <span id="agent-user-name" style="margin-right: 20px; font-weight: 600; color: var(--primary-color);"></span>
             <button class="btn-text active" id="nav-missions">Mes Missions</button>
+            <button class="btn-text" id="nav-tools">Outils Terrain</button>
             <button class="btn-text" id="nav-logout">Déconnexion</button>
           </div>
         </nav>
 
         <div class="content-container">
-          <div class="header-banner">
-            <h3>Signalements en attente de traitement</h3>
-            <p>Mettez à jour le statut des anomalies signalées sur le terrain.</p>
+          
+          <div id="missions-view" class="view active">
+            <div class="header-banner">
+              <h3>Signalements en attente de traitement</h3>
+              <p>Mettez à jour le statut des anomalies signalées sur le terrain.</p>
+            </div>
+            <div class="missions-grid" id="missions-container">
+              <!-- Missions injectées via JS -->
+            </div>
           </div>
 
-          <div class="missions-grid" id="missions-container">
-            <!-- Missions injectées via JS -->
+          <div id="tools-view" class="view hidden">
+            <div class="header-banner" style="background: linear-gradient(135deg, #34495e, #2c3e50);">
+              <h3>Radar Terrain : Infrastructures</h3>
+              <p>Surveillez l'état des équipements intelligents de votre secteur d'intervention.</p>
+            </div>
+            <div id="tools-container" class="missions-grid">
+              <!-- Injecté via JS -->
+            </div>
           </div>
+
         </div>
       </section>
     </div>

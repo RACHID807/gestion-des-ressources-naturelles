@@ -103,10 +103,11 @@ app.get('/api/reports', (req, res) => {
 app.post('/api/reports', authenticateToken, upload.single('image'), (req, res) => {
     const { type, description, latitude, longitude } = req.body;
     const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    const userId = req.user.id; // From token
 
     db.run(
-        `INSERT INTO reports (type, description, latitude, longitude, image_url, status) VALUES ($1, $2, $3, $4, $5, 'en attente') RETURNING id`,
-        [type, description, latitude, longitude, imageUrl],
+        `INSERT INTO reports (user_id, type, description, latitude, longitude, image_url, status) VALUES ($1, $2, $3, $4, $5, $6, 'en attente') RETURNING id`,
+        [userId, type, description, latitude, longitude, imageUrl],
         function(err, result) {
             if (err) return res.status(500).json({ error: err.message });
             res.json({ id: result.rows[0].id, message: 'Report created successfully', imageUrl });
@@ -115,17 +116,40 @@ app.post('/api/reports', authenticateToken, upload.single('image'), (req, res) =
 });
 
 // Update report status (Protected)
-app.put('/api/reports/:id/status', authenticateToken, (req, res) => {
+app.put('/api/reports/:id/status', authenticateToken, upload.single('after_image'), (req, res) => {
     const { id } = req.params;
     const { status, agent_feedback } = req.body;
-    db.run(
-        `UPDATE reports SET status = $1, agent_feedback = $2 WHERE id = $3`,
-        [status, agent_feedback, id],
-        function(err, result) {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json({ message: 'Status updated successfully', changes: result.rowCount });
-        }
-    );
+    const afterImageUrl = req.file ? `/uploads/${req.file.filename}` : null;
+
+    let sql = `UPDATE reports SET status = $1, agent_feedback = $2 WHERE id = $3`;
+    let params = [status, agent_feedback, id];
+
+    if (afterImageUrl) {
+        sql = `UPDATE reports SET status = $1, agent_feedback = $2, after_image_url = $3 WHERE id = $4`;
+        params = [status, agent_feedback, afterImageUrl, id];
+    }
+
+    db.run(sql, params, function(err, result) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: 'Status updated successfully', afterImageUrl });
+    });
+});
+
+// --- CITIZEN PERSONAL DATA ---
+app.get('/api/my-reports', authenticateToken, (req, res) => {
+    db.all('SELECT * FROM reports WHERE user_id = $1 ORDER BY created_at DESC', [req.user.id], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ data: rows });
+    });
+});
+
+app.get('/api/my-rewards', authenticateToken, (req, res) => {
+    db.all('SELECT * FROM rewards WHERE user_id = $1 ORDER BY granted_at DESC', [req.user.id], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        
+        const totalPoints = rows.reduce((sum, r) => sum + (r.points || 0), 0);
+        res.json({ data: rows, totalPoints });
+    });
 });
 
 // Assign report to agent (Protected - Admin Only)
@@ -224,20 +248,122 @@ app.get('/api/leaderboard', (req, res) => {
 // --- STATS API (Protected) ---
 app.get('/api/stats', authenticateToken, (req, res) => {
     const stats = {};
-    // Note: serialize is not needed/supported with the pg pool wrapper
-    db.get('SELECT COUNT(*) as total FROM reports', [], (err, row) => {
-        if (!err && row) stats.totalReports = parseInt(row.total);
-        db.get('SELECT COUNT(*) as pending FROM reports WHERE status = $1', ['en attente'], (err, row) => {
-            if (!err && row) stats.pendingReports = parseInt(row.pending);
-            db.get('SELECT COUNT(*) as active_agents FROM users WHERE role = $1', ['agent'], (err, row) => {
-                if (!err && row) stats.activeAgents = parseInt(row.active_agents) || 12; 
-                db.get('SELECT COUNT(*) as total_resources FROM resources', [], (err, row) => {
-                    if (!err && row) stats.totalResources = parseInt(row.total_resources);
-                    res.json({ data: stats });
-                });
-            });
+    
+    const queries = [
+        { key: 'totalReports', sql: 'SELECT COUNT(*) as val FROM reports' },
+        { key: 'pendingReports', sql: 'SELECT COUNT(*) as val FROM reports WHERE status = $1', params: ['en attente'] },
+        { key: 'activeAgents', sql: 'SELECT COUNT(*) as val FROM users WHERE role = $1', params: ['agent'] },
+        { key: 'totalResources', sql: 'SELECT COUNT(*) as val FROM resources' },
+        { key: 'totalSensors', sql: 'SELECT COUNT(*) as val FROM sensors' },
+        { key: 'totalCarbonSaved', sql: 'SELECT SUM(carbon_impact) as val FROM sensor_readings' },
+        { key: 'totalWaterResources', sql: 'SELECT COUNT(*) as val FROM water_resources' },
+        { key: 'pollutedWater', sql: 'SELECT COUNT(*) as val FROM water_resources WHERE status != \'clean\'' },
+        { key: 'totalMiningSites', sql: 'SELECT COUNT(*) as val FROM mining_sites' },
+        { key: 'highImpactMining', sql: 'SELECT COUNT(*) as val FROM mining_sites WHERE environmental_impact > 7' },
+        { key: 'totalOilFields', sql: 'SELECT COUNT(*) as val FROM oil_fields' },
+        { key: 'leakingOilFields', sql: 'SELECT COUNT(*) as val FROM oil_fields WHERE status = \'leaking\'' },
+        { key: 'byType', sql: 'SELECT type, COUNT(*) as count FROM reports GROUP BY type' },
+        { key: 'byPriority', sql: 'SELECT priority_level, COUNT(*) as count FROM reports GROUP BY priority_level' }
+    ];
+
+    let completed = 0;
+    queries.forEach(q => {
+        db.all(q.sql, q.params || [], (err, rows) => {
+            if (!err && rows) {
+                if (q.key.startsWith('by')) {
+                    stats[q.key] = rows;
+                } else {
+                    stats[q.key] = parseInt(rows[0].val);
+                }
+            }
+            completed++;
+            if (completed === queries.length) {
+                res.json({ data: stats });
+            }
         });
     });
+});
+
+// --- AI SIMULATION API ---
+app.post('/api/ai/analyze', authenticateToken, upload.single('image'), (req, res) => {
+    // Simulate AI processing delay
+    setTimeout(() => {
+        const types = ['pollution', 'dechets', 'deforestation'];
+        const randomType = types[Math.floor(Math.random() * types.length)];
+        const confidence = (Math.random() * (0.99 - 0.85) + 0.85).toFixed(2);
+        
+        res.json({ 
+            detectedType: randomType, 
+            confidence: confidence,
+            message: "Analyse terminée avec succès" 
+        });
+    }, 2000);
+});
+
+// --- INTERNAL NOTES API ---
+app.get('/api/reports/:id/notes', authenticateToken, (req, res) => {
+    const sql = `
+        SELECT n.*, u.name as user_name 
+        FROM internal_notes n 
+        JOIN users u ON n.user_id = u.id 
+        WHERE n.report_id = $1 
+        ORDER BY n.created_at ASC
+    `;
+    db.all(sql, [req.params.id], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ data: rows });
+    });
+});
+
+app.post('/api/reports/:id/notes', authenticateToken, (req, res) => {
+    const { content } = req.body;
+    db.run(
+        "INSERT INTO internal_notes (report_id, user_id, content) VALUES ($1, $2, $3)",
+        [req.params.id, req.user.id, content],
+        function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ message: "Note ajoutée" });
+        }
+    );
+});
+
+// --- QUIZ API ---
+app.get('/api/quizzes', (req, res) => {
+    db.all('SELECT * FROM quizzes', [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ data: rows });
+    });
+});
+
+app.get('/api/quizzes/:id/questions', authenticateToken, (req, res) => {
+    db.all('SELECT * FROM questions WHERE quiz_id = $1', [req.params.id], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        // Parse JSON options
+        const questions = rows.map(r => ({ ...r, options: JSON.parse(r.options) }));
+        res.json({ data: questions });
+    });
+});
+
+app.post('/api/quizzes/:id/submit', authenticateToken, (req, res) => {
+    const { score } = req.body;
+    const quizId = req.params.id;
+    const userId = req.user.id;
+
+    db.run(
+        "INSERT INTO user_quiz_results (user_id, quiz_id, score) VALUES ($1, $2, $3)",
+        [userId, quizId, score],
+        function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            
+            // If score is perfect or high, grant bonus points
+            if (score >= 80) {
+                db.run("INSERT INTO rewards (user_id, points, badge_name) VALUES ($1, $2, $3)", 
+                    [userId, 50, 'Génie de l\'Environnement']);
+            }
+            
+            res.json({ message: "Score enregistré", bonus: score >= 80 });
+        }
+    );
 });
 
 // --- USERS API (Protected - Admin Only) ---
@@ -261,6 +387,274 @@ app.post('/api/users', authenticateToken, (req, res) => {
     });
 });
 
+// --- SENSORS & CARBON IMPACT API ---
+app.get('/api/sensors', authenticateToken, (req, res) => {
+    db.all('SELECT * FROM sensors ORDER BY created_at DESC', [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ data: rows });
+    });
+});
+
+app.post('/api/sensors/:id/reading', (req, res) => {
+    const { id } = req.params;
+    const { data } = req.body; // Sensor data, e.g., { pm25: 350, temperature: 28 }
+
+    // Calculate carbon impact based on sensor type
+    let carbonImpact = 0;
+    db.get("SELECT * FROM sensors WHERE id = $1", [id], (err, sensor) => {
+        if (err || !sensor) return res.status(404).json({ error: "Capteur non trouvé" });
+
+        if (sensor.type === 'air_quality' && data.pm25) {
+            // CO2 saved: if PM2.5 below baseline, estimate reduction
+            const reduction = Math.max(0, sensor.carbon_baseline - data.pm25);
+            carbonImpact = reduction * 0.1; // Arbitrary formula: 0.1 kg CO2 per unit PM2.5 reduction
+        } else if (sensor.type === 'water_level' && data.level) {
+            // For water: if level stable, assume less pollution runoff
+            carbonImpact = data.level > 0 ? 0.5 : 0; // Simple positive impact
+        } else if (sensor.type === 'temperature' && data.temp) {
+            // Temperature: cooler = better for carbon sequestration
+            carbonImpact = Math.max(0, (30 - data.temp) * 0.2);
+        }
+
+        // Update sensor last_reading
+        db.run("UPDATE sensors SET last_reading = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2", [JSON.stringify(data), id]);
+
+        // Insert reading history
+        db.run("INSERT INTO sensor_readings (sensor_id, reading_data, carbon_impact) VALUES ($1, $2, $3)", 
+            [id, JSON.stringify(data), carbonImpact]);
+
+        res.json({ message: "Lecture enregistrée", carbonImpact, sensor: sensor.type });
+    });
+});
+
+app.get('/api/carbon-impact', (req, res) => {
+    // Calculate total carbon impact from all readings
+    db.all("SELECT SUM(carbon_impact) as total FROM sensor_readings", [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        const totalCarbonSaved = rows[0].total || 0;
+
+        // Additional metrics: total trees equivalent (1 tree ~ 20kg CO2/year)
+        const treesEquivalent = Math.floor(totalCarbonSaved / 20);
+
+        res.json({ 
+            totalCarbonSaved: parseFloat(totalCarbonSaved.toFixed(2)), 
+            treesEquivalent,
+            unit: "kg CO2"
+        });
+    });
+});
+
+// --- WATER RESOURCES API ---
+app.get('/api/water-resources', authenticateToken, (req, res) => {
+    db.all('SELECT * FROM water_resources ORDER BY created_at DESC', [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ data: rows });
+    });
+});
+
+app.post('/api/water-resources/:id/quality', (req, res) => {
+    const { id } = req.params;
+    const { pH, turbidity, contaminants } = req.body;
+
+    db.get("SELECT * FROM water_resources WHERE id = $1", [id], (err, resource) => {
+        if (err || !resource) return res.status(404).json({ error: "Ressource non trouvée" });
+
+        const baseline = JSON.parse(resource.quality_baseline || '{}');
+        let pollutionChange = 0;
+        let carbonImpact = 0;
+
+        // Calculate pollution level change
+        if (pH && baseline.pH) pollutionChange += Math.abs(pH - baseline.pH) * 10;
+        if (turbidity && baseline.turbidity) pollutionChange += Math.max(0, turbidity - baseline.turbidity);
+
+        // CO2 impact: pollution reduction saves CO2 (water treatment avoided)
+        carbonImpact = Math.max(0, (resource.pollution_level - pollutionChange) * 0.5);
+
+        // Update resource
+        db.run("UPDATE water_resources SET pollution_level = $1, carbon_impact = carbon_impact + $2, status = CASE WHEN $1 > 5 THEN 'critical' WHEN $1 > 2 THEN 'polluted' ELSE 'clean' END WHERE id = $3", 
+            [pollutionChange, carbonImpact, id]);
+
+        res.json({ message: "Qualité mise à jour", pollutionChange, carbonImpact });
+    });
+});
+
+// --- MINING SITES API ---
+app.get('/api/mining-sites', authenticateToken, (req, res) => {
+    db.all('SELECT * FROM mining_sites ORDER BY created_at DESC', [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ data: rows });
+    });
+});
+
+app.post('/api/mining-sites/:id/impact', (req, res) => {
+    const { id } = req.params;
+    const { extraction_rate, dust_level, noise_level } = req.body;
+
+    db.get("SELECT * FROM mining_sites WHERE id = $1", [id], (err, site) => {
+        if (err || !site) return res.status(404).json({ error: "Site non trouvé" });
+
+        let environmentalImpact = site.environmental_impact;
+        let carbonEmissions = site.carbon_emissions;
+
+        // Update based on readings
+        if (dust_level > 50) environmentalImpact += 0.5; // Dust increases impact
+        if (noise_level > 80) environmentalImpact += 0.3;
+        if (extraction_rate > site.extraction_rate) carbonEmissions += (extraction_rate - site.extraction_rate) * 0.01; // CO2 per ton
+
+        // Update site
+        db.run("UPDATE mining_sites SET extraction_rate = $1, environmental_impact = $2, carbon_emissions = $3 WHERE id = $4", 
+            [extraction_rate, environmentalImpact, carbonEmissions, id]);
+
+        res.json({ message: "Impact mis à jour", environmentalImpact, carbonEmissions });
+    });
+});
+
+// --- OIL FIELDS API ---
+app.get('/api/oil-fields', authenticateToken, (req, res) => {
+    db.all('SELECT * FROM oil_fields ORDER BY created_at DESC', [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ data: rows });
+    });
+});
+
+app.post('/api/oil-fields/:id/leak', (req, res) => {
+    const { id } = req.params;
+    const { leak_detected, production_rate, methane_level } = req.body;
+
+    db.get("SELECT * FROM oil_fields WHERE id = $1", [id], (err, field) => {
+        if (err || !field) return res.status(404).json({ error: "Champ non trouvé" });
+
+        let carbonEmissions = field.carbon_emissions;
+        let status = field.status;
+
+        if (leak_detected) {
+            carbonEmissions += 1000; // Major leak impact
+            status = 'leaking';
+        } else if (methane_level > 10) {
+            carbonEmissions += methane_level * 25; // Methane is potent GHG
+        }
+
+        // Update field
+        db.run("UPDATE oil_fields SET production_rate = $1, carbon_emissions = $2, status = $3 WHERE id = $4", 
+            [production_rate, carbonEmissions, status, id]);
+
+        res.json({ message: "État mis à jour", carbonEmissions, status });
+    });
+});
+
+// --- ENERGY RESOURCES API ---
+app.get('/api/energy-resources', authenticateToken, (req, res) => {
+    db.all('SELECT * FROM energy_resources ORDER BY created_at DESC', [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ data: rows });
+    });
+});
+
+app.put('/api/energy-resources/:id/toggle-smart-grid', authenticateToken, (req, res) => {
+    const { id } = req.params;
+    db.get("SELECT smart_grid_active FROM energy_resources WHERE id = $1", [id], (err, row) => {
+        if (err || !row) return res.status(404).json({ error: "Ressource non trouvée" });
+        const newValue = !row.smart_grid_active;
+        db.run("UPDATE energy_resources SET smart_grid_active = $1 WHERE id = $2", [newValue, id], (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ message: "Smart Grid mis à jour", smart_grid_active: newValue });
+        });
+    });
+});
+
+// --- ADVANCED MANAGEMENT TOGGLES ---
+app.put('/api/water-resources/:id/toggle-smart-meter', authenticateToken, (req, res) => {
+    const { id } = req.params;
+    db.get("SELECT smart_meter_active FROM water_resources WHERE id = $1", [id], (err, row) => {
+        if (err || !row) return res.status(404).json({ error: "Ressource non trouvée" });
+        const newValue = !row.smart_meter_active;
+        db.run("UPDATE water_resources SET smart_meter_active = $1 WHERE id = $2", [newValue, id], (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ message: "Smart Meter mis à jour", smart_meter_active: newValue });
+        });
+    });
+});
+
+app.put('/api/mining-sites/:id/toggle-bioleaching', authenticateToken, (req, res) => {
+    const { id } = req.params;
+    db.get("SELECT bioleaching_active FROM mining_sites WHERE id = $1", [id], (err, row) => {
+        if (err || !row) return res.status(404).json({ error: "Site non trouvé" });
+        const newValue = !row.bioleaching_active;
+        let scoreQuery = newValue ? ", compliance_score = LEAST(100, compliance_score + 10)" : ", compliance_score = GREATEST(0, compliance_score - 10)";
+        
+        db.run(`UPDATE mining_sites SET bioleaching_active = $1 ${scoreQuery} WHERE id = $2`, [newValue, id], (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ message: "Biolixiviation mise à jour", bioleaching_active: newValue });
+        });
+    });
+});
+
+// --- PUBLIC COMMUNITY STATS ---
+app.get('/api/public/community-resources', (req, res) => {
+    const stats = {
+        smartWaterPercentage: 0,
+        averageBatteryLevel: 0,
+        averageCompliance: 0
+    };
+
+    const queries = [
+        { key: 'smartWater', sql: "SELECT COUNT(*) as total, SUM(CASE WHEN smart_meter_active THEN 1 ELSE 0 END) as smart FROM water_resources" },
+        { key: 'batteryLevel', sql: "SELECT AVG(battery_level) as avg_bat FROM energy_resources" },
+        { key: 'compliance', sql: "SELECT AVG(compliance_score) as avg_comp FROM mining_sites" }
+    ];
+
+    let completed = 0;
+    queries.forEach(q => {
+        db.all(q.sql, [], (err, rows) => {
+            if (!err && rows && rows.length > 0) {
+                if (q.key === 'smartWater') {
+                    const total = rows[0].total || 0;
+                    const smart = rows[0].smart || 0;
+                    stats.smartWaterPercentage = total > 0 ? Math.round((smart / total) * 100) : 0;
+                } else if (q.key === 'batteryLevel') {
+                    stats.averageBatteryLevel = Math.round(rows[0].avg_bat || 0);
+                } else if (q.key === 'compliance') {
+                    stats.averageCompliance = Math.round(rows[0].avg_comp || 0);
+                }
+            }
+            completed++;
+            if (completed === queries.length) {
+                res.json({ data: stats });
+            }
+        });
+    });
+});
+
+// --- EXTENDED STATS ---
+app.get('/api/extended-stats', authenticateToken, (req, res) => {
+    const stats = {};
+
+    const queries = [
+        { key: 'totalWaterResources', sql: 'SELECT COUNT(*) as val FROM water_resources' },
+        { key: 'pollutedWater', sql: 'SELECT COUNT(*) as val FROM water_resources WHERE status != \'clean\'' },
+        { key: 'totalMiningSites', sql: 'SELECT COUNT(*) as val FROM mining_sites' },
+        { key: 'highImpactMining', sql: 'SELECT COUNT(*) as val FROM mining_sites WHERE environmental_impact > 7' },
+        { key: 'totalOilFields', sql: 'SELECT COUNT(*) as val FROM oil_fields' },
+        { key: 'leakingOilFields', sql: 'SELECT COUNT(*) as val FROM oil_fields WHERE status = \'leaking\'' },
+        { key: 'totalCarbonFromResources', sql: 'SELECT (SELECT SUM(carbon_impact) FROM water_resources) + (SELECT SUM(carbon_emissions) FROM mining_sites) + (SELECT SUM(carbon_emissions) FROM oil_fields) as val' }
+    ];
+
+    let completed = 0;
+    queries.forEach(q => {
+        db.all(q.sql, q.params || [], (err, rows) => {
+            if (!err && rows) {
+                stats[q.key] = parseInt(rows[0].val) || 0;
+            }
+            completed++;
+            if (completed === queries.length) {
+                res.json({ data: stats });
+            }
+        });
+    });
+});
+
 app.listen(PORT, () => {
     console.log(`Backend API v1 is running on http://localhost:${PORT}`);
 });
+
+module.exports = app;
