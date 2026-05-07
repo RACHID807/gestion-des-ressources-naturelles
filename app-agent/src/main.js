@@ -1,6 +1,16 @@
+console.log("🚀 Portail Agent : Script chargé");
+
+// Gestionnaire d'erreurs global pour le débogage en production
+window.onerror = function(msg, url, lineNo, columnNo, error) {
+    console.error('Erreur Globale:', msg, 'à', lineNo, ':', columnNo);
+    alert('Erreur au chargement du script: ' + msg);
+    return false;
+};
+
 const authSection = document.getElementById('auth-section');
 const mainSection = document.getElementById('main-section');
 const loginForm = document.getElementById('login-form');
+console.log("Formulaire trouvé :", !!loginForm);
 const navLogout = document.getElementById('nav-logout');
 const missionsContainer = document.getElementById('missions-container');
 
@@ -9,7 +19,19 @@ const API_URL = '/api';
 // --- SUPABASE REALTIME CONFIG ---
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://obrujgpbduzsenllwxgx.supabase.co';
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9icnVqZ3BiZHV6c2VubGx3eGd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjcxMjQsImV4cCI6MjA5Mjk0MzEyNH0.CW93l7Ki_IPyLha0fdg6SjmytKECskB3DDor2tRWBG8';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let supabase;
+try {
+    if (window.supabase && window.supabase.createClient) {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        console.log("✅ Supabase initialisé avec succès");
+    } else {
+        console.error("❌ La bibliothèque Supabase (CDN) n'est pas chargée correctement");
+        alert("Attention: La connexion temps réel pourrait ne pas fonctionner.");
+    }
+} catch (e) {
+    console.error("Erreur initialisation Supabase:", e);
+}
 
 function initRealtime() {
     console.log("Agent : Connexion au flux Temps Réel...");
@@ -52,29 +74,49 @@ function showToast(message, isError = false) {
 }
 
 // --- Navigation ---
-loginForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email = document.getElementById('agent-id').value;
-    const password = document.getElementById('password').value;
-    try {
-        const res = await fetch(`${API_URL}/auth/login`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
-        });
-        const data = await res.json();
-        if (res.ok) {
-            localStorage.setItem('eco_token', data.token);
-            localStorage.setItem('eco_user', JSON.stringify(data.user));
-            document.getElementById('agent-user-name').textContent = data.user.name;
-            authSection.classList.replace('active', 'hidden');
-            mainSection.classList.replace('hidden', 'active');
-            fetchAndRenderMissions();
-            initRealtime();
-            showToast('Agent connecté : ' + data.user.name);
-        } else {
-            showToast(data.error || 'Erreur', true);
+if (loginForm) {
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        console.log("🔄 Événement submit intercepté");
+        
+        const email = document.getElementById('agent-id').value;
+        const password = document.getElementById('password').value;
+        
+        console.log("📡 Tentative de connexion pour :", email);
+
+        try {
+            const response = await fetch(`${API_URL}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+
+            console.log("📥 Réponse reçue, statut :", response.status);
+            const data = await response.json();
+
+            if (response.ok) {
+                console.log("✅ Connexion réussie !");
+                localStorage.setItem('eco_token', data.token);
+                localStorage.setItem('eco_user', JSON.stringify(data.user));
+                
+                authSection.classList.add('hidden');
+                mainSection.classList.remove('hidden');
+                document.getElementById('agent-user-name').textContent = data.user.name;
+                
+                fetchAndRenderMissions();
+                if (supabase) initRealtime();
+                showToast('Agent connecté : ' + data.user.name);
+            } else {
+                console.warn("❌ Erreur de connexion :", data.error);
+                showToast(data.error || 'Identifiants invalides', true);
+            }
+        } catch (err) {
+            console.error("🔥 Erreur réseau ou serveur :", err);
+            showToast('Erreur de connexion au serveur', true);
         }
-    } catch (err) {
+    });
+}
+
         showToast('Erreur serveur API', true);
     }
 });
